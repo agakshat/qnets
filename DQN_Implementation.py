@@ -14,30 +14,35 @@ class LinearQNetwork(nn.Module):
 		self.lin = nn.Linear(obs_dim,action_dim)
 
 	def forward(self,obs):
-		return F.softmax(self.lin(obs),dim=1)
+		return self.lin(obs)
 
-class QNetwork():
+class DQN(nn.Module):
+	def  __init__(self,obs_dim,action_dim):
+		super().__init__()
+		self.fc1 = nn.Linear(obs_dim,16)
+		self.fc2 = nn.Linear(16,16)
+		self.fc3 = nn.Linear(16,action_dim)
 
-	# This class essentially defines the network architecture. 
-	# The network should take in state of the world as an input, 
-	# and output Q values of the actions available to the agent as the output. 
+	def forward(self,obs):
+		x = F.tanh(self.fc1(obs))
+		x = F.tanh(self.fc2(x))
+		x = self.fc3(x)
+		return x
 
-	def __init__(self, environment_name):
-		# Define your network architecture here. It is also a good idea to define any training operations 
-		# and optimizers here, initialize your variables, or alternately compile your model here.  
-		pass
+class DuelingQN(nn.Module):
+	def  __init__(self,obs_dim,action_dim):
+		super().__init__()
+		self.fc1 = nn.Linear(obs_dim,16)
+		self.fc2 = nn.Linear(16,16)
+		self.fc3 = nn.Linear(16,action_dim)
+		self.val = nn.Linear(16,1)
 
-	def save_model_weights(self, suffix):
-		# Helper function to save your model / weights. 
-		pass
-
-	def load_model(self, model_file):
-		# Helper function to load an existing model.
-		pass
-
-	def load_model_weights(self,weight_file):
-		# Helper funciton to load model weights. 
-		pass
+	def forward(self,obs):
+		x = F.tanh(self.fc1(obs))
+		x = F.tanh(self.fc2(x))
+		adv = self.fc3(x)
+		val = self.val(x)
+		return adv,val
 
 class Replay_Memory():
 
@@ -83,19 +88,19 @@ class DQN_Agent():
 		# as well as training parameters - number of episodes / iterations, etc. 
 
 		self.env =  gym.make(environment_name)
-		self.qnet = LinearQNetwork(self.env.observation_space.shape[0],self.env.action_space.n)
-		self.memory = Replay_Memory(memory_size=1)
+		self.qnet = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
+		self.memory = Replay_Memory(memory_size=100000)
 		self.eps_start = 0.5
 		self.eps_end = 0.05
 		self.eps_iter = 100000
 		self.eps = self.eps_start
 		self.num_iter = 1e6
-		self.num_episodes = 3000
+		self.num_episodes = 300000
 		self.max_ep_length = 1000
 		self.render = render
-		self.batch_size = 1
+		self.batch_size = 16
 		self.gamma = 0.99
-		self.lr = 1e-4
+		self.lr = 1e-3
 		self.buffer_size = 50000
 		self.loss = nn.MSELoss()
 		self.optim = torch.optim.Adam(self.qnet.parameters(),lr=self.lr)
@@ -110,8 +115,9 @@ class DQN_Agent():
 		for ep in range(self.num_episodes):
 			obs = self.env.reset()
 			episode_reward = 0
+			reward_list = np.zeros(10)
 			if self.eps>0.05:
-				self.eps = -0.0009*ep + 0.5	 
+				self.eps = -0.0015*ep + 0.9	 
 			for iteration in range(self.max_ep_length):
 				if self.render:
 					self.env.render()
@@ -124,23 +130,36 @@ class DQN_Agent():
 				self.memory.append(obs,act,done,next_obs,reward)
 				if self.memory.len()<self.batch_size:
 					continue
-				batch_obs,batch_act,batch_done,batch_next_obs,batch_reward = self.memory.sample_batch(batch_size=1)
-				y = Variable(torch.zeros(len(batch_reward)),requires_grad=True)
-				targetQ = torch.max(self.qnet(Variable(torch.FloatTensor(batch_next_obs))),dim=1)
+				batch_obs,batch_act,batch_done,batch_next_obs,batch_reward = self.memory.sample_batch(batch_size=self.batch_size)
+				#if (batch_obs[0]!=obs)
+				#pdb.set_trace()
+				y = Variable(torch.zeros(len(batch_reward)))
+				var_batch_no = Variable(torch.FloatTensor(batch_next_obs),volatile=True)
+				next_a = self.qnet(var_batch_no)
+				targetQ,_ = torch.max(next_a,dim=1)
+				targetQ.volatile = False
 				for j in range(len(batch_obs)):
 					if batch_done[j]:
 						y[j] = batch_reward[j]
 					else:
 						y[j] = batch_reward[j] + self.gamma*targetQ[j]
-				realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs),volatile=True)),dim=1,index=Variable(torch.LongTensor(batch_act)).unsqueeze(1))
-				loss = self.loss(y,realQ)
+				#pdb.set_trace()
+				realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs))),dim=1,index=Variable(torch.LongTensor(batch_act)).unsqueeze(1))
+				#print("realQ: {}, y: {}".format(realQ.data[0],y.data[0]))
+				#loss = self.mse_loss(realQ,y)
+				loss = self.loss(realQ,y)
+				#print("loss: ",loss.data[0])
 				self.optim.zero_grad()
 				loss.backward()
 				self.optim.step()
 				obs = next_obs
 				episode_reward += reward
+				reward_list[ep%10] = episode_reward
 				if done:
-					print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
+					if ep%10==0:
+						#for p in self.qnet.parameters():
+						#	print(p.data)	
+						print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
 					break
 
 
@@ -153,6 +172,114 @@ class DQN_Agent():
 		# Initialize your replay memory with a burn_in number of episodes / transitions. 
 
 		pass
+
+class DuelingQN_Agent():
+
+	# In this class, we will implement functions to do the following. 
+	# (1) Create an instance of the Q Network class.
+	# (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
+	#		(a) Epsilon Greedy Policy.
+	# 		(b) Greedy Policy. 
+	# (3) Create a function to train the Q Network, by interacting with the environment.
+	# (4) Create a function to test the Q Network's performance on the environment.
+	# (5) Create a function for Experience Replay.
+	
+	def __init__(self, environment_name, render=False):
+
+		# Create an instance of the network itself, as well as the memory. 
+		# Here is also a good place to set environmental parameters,
+		# as well as training parameters - number of episodes / iterations, etc. 
+
+		self.env =  gym.make(environment_name)
+		self.qnet = DuelingQN(self.env.observation_space.shape[0],self.env.action_space.n)
+		self.memory = Replay_Memory(memory_size=100000)
+		self.eps_start = 0.5
+		self.eps_end = 0.05
+		self.eps_iter = 100000
+		self.eps = self.eps_start
+		self.num_iter = 1e6
+		self.num_episodes = 300000
+		self.max_ep_length = 1000
+		self.render = render
+		self.batch_size = 16
+		self.gamma = 1#0.99
+		self.lr = 1e-3
+		self.buffer_size = 50000
+		self.loss = nn.MSELoss()
+		self.optim = torch.optim.Adam(self.qnet.parameters(),lr=self.lr)
+
+	def train(self):
+		# In this function, we will train our network. 
+		# If training without experience replay_memory, then you will interact with the environment 
+		# in this function, while also updating your network parameters. 
+
+		# If you are using a replay memory, you should interact with environment here, and store these 
+		# transitions to memory, while also updating your model.
+		for ep in range(self.num_episodes):
+			obs = self.env.reset()
+			episode_reward = 0
+			reward_list = np.zeros(10)
+			if self.eps>0.05:
+				self.eps = -0.0009*ep + 0.5	 
+			for iteration in range(self.max_ep_length):
+				if self.render:
+					self.env.render()
+				if np.random.rand()<self.eps:
+					act = self.env.action_space.sample()
+				else:
+					adv,val = self.qnet(Variable(torch.from_numpy(obs).float().unsqueeze(0)))
+					q = val + (adv - torch.sum(adv,dim=1)/self.env.action_space.shape[0])
+					_,act = torch.max(q,dim=1)
+					act = act.data[0]
+				next_obs,reward,done,_ = self.env.step(act)
+				self.memory.append(obs,act,done,next_obs,reward)
+				if self.memory.len()<self.batch_size:
+					continue
+				batch_obs,batch_act,batch_done,batch_next_obs,batch_reward = self.memory.sample_batch(batch_size=self.batch_size)
+				#if (batch_obs[0]!=obs)
+				#pdb.set_trace()
+				y = Variable(torch.zeros(len(batch_reward)))
+				var_batch_no = Variable(torch.FloatTensor(batch_next_obs),volatile=True)
+				batch_next_adv,batch_next_val = self.qnet(Variable(torch.from_numpy(batch_next_obs).float().unsqueeze(0)))
+				targetQ = batch_next_val + (adv - torch.sum(adv,dim=1)/self.env.action_space.shape[0])
+				next_a = self.qnet(var_batch_no)
+				targetQ,_ = torch.max(next_a,dim=1)
+				targetQ.volatile = False
+				for j in range(len(batch_obs)):
+					if batch_done[j]:
+						y[j] = batch_reward[j]
+					else:
+						y[j] = batch_reward[j] + self.gamma*targetQ[j]
+				#pdb.set_trace()
+				realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs))),dim=1,index=Variable(torch.LongTensor(batch_act)).unsqueeze(1))
+				#print("realQ: {}, y: {}".format(realQ.data[0],y.data[0]))
+				#loss = self.mse_loss(realQ,y)
+				loss = self.loss(realQ,y)
+				#print("loss: ",loss.data[0])
+				self.optim.zero_grad()
+				loss.backward()
+				self.optim.step()
+				obs = next_obs
+				episode_reward += reward
+				reward_list[ep%10] = episode_reward
+				if done:
+					if ep%10==0:
+						#for p in self.qnet.parameters():
+						#	print(p.data)	
+						print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
+					break
+
+
+	def test(self, model_file=None):
+		# Evaluate the performance of your agent over 100 episodes, by calculating cummulative rewards for the 100 episodes.
+		# Here you need to interact with the environment, irrespective of whether you are using a memory. 
+		pass
+
+	def burn_in_memory():
+		# Initialize your replay memory with a burn_in number of episodes / transitions. 
+
+		pass
+
 
 def parse_arguments():
 	parser = argparse.ArgumentParser(description='Deep Q Network Argument Parser')
