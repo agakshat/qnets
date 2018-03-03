@@ -34,13 +34,15 @@ class DuelingQN(nn.Module):
 		super().__init__()
 		self.fc1 = nn.Linear(obs_dim,16)
 		self.fc2 = nn.Linear(16,16)
-		self.fc3 = nn.Linear(16,action_dim)
+		self.fc3 = nn.Linear(16,16)
+		self.adv = nn.Linear(16,action_dim)
 		self.val = nn.Linear(16,1)
 
 	def forward(self,obs):
-		x = F.tanh(self.fc1(obs))
-		x = F.tanh(self.fc2(x))
-		adv = self.fc3(x)
+		x = F.relu(self.fc1(obs))
+		x = F.relu(self.fc2(x))
+		x = F.relu(self.fc3(x))
+		adv = self.adv(x)
 		val = self.val(x)
 		return adv,val
 
@@ -81,13 +83,13 @@ class DQN_Agent():
 	# (4) Create a function to test the Q Network's performance on the environment.
 	# (5) Create a function for Experience Replay.
 	
-	def __init__(self, environment_name, render=False):
+	def __init__(self, environment_name, render=False, use_cuda = False):
 
 		# Create an instance of the network itself, as well as the memory. 
 		# Here is also a good place to set environmental parameters,
 		# as well as training parameters - number of episodes / iterations, etc. 
-
-		self.env =  gym.make(environment_name)
+		self.env_name = environment_name
+		self.env =  gym.make(self.env_name)
 		self.qnet = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
 		self.memory = Replay_Memory(memory_size=100000)
 		self.eps_start = 0.5
@@ -104,6 +106,7 @@ class DQN_Agent():
 		self.buffer_size = 50000
 		self.loss = nn.MSELoss()
 		self.optim = torch.optim.Adam(self.qnet.parameters(),lr=self.lr)
+		self.use_cuda = use_cuda
 
 	def train(self):
 		# In this function, we will train our network. 
@@ -157,9 +160,9 @@ class DQN_Agent():
 				reward_list[ep%10] = episode_reward
 				if done:
 					if ep%10==0:
-						#for p in self.qnet.parameters():
-						#	print(p.data)	
 						print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
+					if ep%500==0:
+						torch.save(self.qnet.state_dict,self.env_name+'.dqn.pt')
 					break
 
 
@@ -184,13 +187,13 @@ class DuelingQN_Agent():
 	# (4) Create a function to test the Q Network's performance on the environment.
 	# (5) Create a function for Experience Replay.
 	
-	def __init__(self, environment_name, render=False):
+	def __init__(self, environment_name, render=False, use_cuda = False):
 
 		# Create an instance of the network itself, as well as the memory. 
 		# Here is also a good place to set environmental parameters,
 		# as well as training parameters - number of episodes / iterations, etc. 
-
-		self.env =  gym.make(environment_name)
+		self.env_name = environment_name
+		self.env =  gym.make(self.env_name)
 		self.qnet = DuelingQN(self.env.observation_space.shape[0],self.env.action_space.n)
 		self.memory = Replay_Memory(memory_size=100000)
 		self.eps_start = 0.5
@@ -207,6 +210,7 @@ class DuelingQN_Agent():
 		self.buffer_size = 50000
 		self.loss = nn.MSELoss()
 		self.optim = torch.optim.Adam(self.qnet.parameters(),lr=self.lr)
+		self.use_cuda = use_cuda
 
 	def train(self):
 		# In this function, we will train our network. 
@@ -267,9 +271,9 @@ class DuelingQN_Agent():
 				reward_list[ep%10] = episode_reward
 				if done:
 					if ep%10==0:
-						#for p in self.qnet.parameters():
-						#	print(p.data)	
 						print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
+					if ep%500==0:
+						torch.save(self.qnet.state_dict,self.env_name+'duelingqn.pt')
 					break
 
 
@@ -290,14 +294,20 @@ def parse_arguments():
 	parser.add_argument('--render',dest='render',type=int,default=0)
 	parser.add_argument('--train',dest='train',type=int,default=1)
 	parser.add_argument('--model',dest='model_file',type=str)
+	parser.add_argument('--dueling',dest='dueling',type=int,default=0)
+	parser.add_argument('--no-cuda',action='store_true',default=False)
 	return parser.parse_args()
 
 def main(args):
 
 	args = parse_arguments()
 	environment_name = args.env
+	args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-	agent = DuelingQN_Agent(environment_name,args.render)
+	if args.dueling:
+		agent = DuelingQN_Agent(environment_name,args.render,args.cuda)
+	else:
+		agent = DQN_Agent(environment_name,args.render,args.cuda)
 	agent.train()
 	# Setting the session to allow growth, so it doesn't allocate all GPU memory. 
 	#gpu_ops = tf.GPUOptions(allow_growth=True)
