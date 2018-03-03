@@ -228,7 +228,8 @@ class DuelingQN_Agent():
 					act = self.env.action_space.sample()
 				else:
 					adv,val = self.qnet(Variable(torch.from_numpy(obs).float().unsqueeze(0)))
-					q = val + (adv - torch.sum(adv,dim=1)/self.env.action_space.shape[0])
+					#pdb.set_trace()
+					q = val + (adv - torch.sum(adv,dim=1)/self.env.action_space.n)
 					_,act = torch.max(q,dim=1)
 					act = act.data[0]
 				next_obs,reward,done,_ = self.env.step(act)
@@ -240,10 +241,10 @@ class DuelingQN_Agent():
 				#pdb.set_trace()
 				y = Variable(torch.zeros(len(batch_reward)))
 				var_batch_no = Variable(torch.FloatTensor(batch_next_obs),volatile=True)
-				batch_next_adv,batch_next_val = self.qnet(Variable(torch.from_numpy(batch_next_obs).float().unsqueeze(0)))
-				targetQ = batch_next_val + (adv - torch.sum(adv,dim=1)/self.env.action_space.shape[0])
-				next_a = self.qnet(var_batch_no)
+				batch_next_adv,batch_next_val = self.qnet(var_batch_no)
+				next_a = batch_next_val + batch_next_adv - (torch.sum(batch_next_adv,dim=1)/self.env.action_space.n).unsqueeze(1)
 				targetQ,_ = torch.max(next_a,dim=1)
+				#pdb.set_trace()
 				targetQ.volatile = False
 				for j in range(len(batch_obs)):
 					if batch_done[j]:
@@ -251,7 +252,9 @@ class DuelingQN_Agent():
 					else:
 						y[j] = batch_reward[j] + self.gamma*targetQ[j]
 				#pdb.set_trace()
-				realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs))),dim=1,index=Variable(torch.LongTensor(batch_act)).unsqueeze(1))
+				batch_adv,batch_val = self.qnet(Variable(torch.FloatTensor(batch_obs)))
+				a = batch_val + batch_adv - (torch.sum(batch_adv,dim=1)/self.env.action_space.n).unsqueeze(1)
+				realQ = torch.gather(a,dim=1,index=Variable(torch.LongTensor(batch_act)).unsqueeze(1))
 				#print("realQ: {}, y: {}".format(realQ.data[0],y.data[0]))
 				#loss = self.mse_loss(realQ,y)
 				loss = self.loss(realQ,y)
@@ -294,7 +297,7 @@ def main(args):
 	args = parse_arguments()
 	environment_name = args.env
 
-	agent = DQN_Agent(environment_name,args.render)
+	agent = DuelingQN_Agent(environment_name,args.render)
 	agent.train()
 	# Setting the session to allow growth, so it doesn't allocate all GPU memory. 
 	#gpu_ops = tf.GPUOptions(allow_growth=True)
