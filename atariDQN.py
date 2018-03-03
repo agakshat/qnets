@@ -9,6 +9,7 @@ import random
 import pdb
 import cv2
 import copy
+import torch.backends.cudnn as cudnn
 
 class DQN(nn.Module):
 	def  __init__(self,obs_dim,action_dim):
@@ -53,6 +54,9 @@ class DQN_Agent():
 		self.env_name = environment_name
 		self.env =  gym.make(self.env_name)
 		self.qnet = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
+		if use_cuda:
+            		self.qnet = nn.DataParallel(self.qnet)
+            		self.qnet = self.qnet.cuda()
 		self.qnet_target = copy.deepcopy(self.qnet)
 		self.memory = Replay_Memory(memory_size=100000)
 		self.eps_start = 0.5
@@ -64,10 +68,15 @@ class DQN_Agent():
 		self.max_ep_length = 1000
 		self.render = render
 		self.batch_size = 16
-		self.gamma = 0.99
+		if self.env_name == 'MountainCar-v0':
+            		self.gamma = 1
+		else:
+            		self.gamma = 0.99
 		self.lr = 1e-3
 		self.buffer_size = 50000
 		self.loss = nn.MSELoss()
+		if use_cuda:
+            		self.loss = self.loss.cuda()
 		self.optim = torch.optim.Adam(self.qnet.parameters(),lr=self.lr)
 		self.use_cuda = use_cuda
 		self.stacked_obs = np.zeros((4,84,84))
@@ -102,7 +111,10 @@ class DQN_Agent():
 				if np.random.rand()<self.eps:
 					act = self.env.action_space.sample()
 				else:
-					_,act = torch.max(self.qnet(Variable(torch.from_numpy(self.stacked_obs).float().unsqueeze(0))),dim=1)
+					if self.use_cuda:
+						_,act = torch.max(self.qnet(Variable(torch.from_numpy(self.stacked_obs).float().cuda().unsqueeze(0))),dim=1)
+					else:
+						_,act = torch.max(self.qnet(Variable(torch.from_numpy(self.stacked_obs).float().unsqueeze(0))),dim=1)
 					act = act.data[0]
 				next_obs,reward,done,_ = self.env.step(act)
 				soCopy = self.stacked_obs.copy()
@@ -111,8 +123,12 @@ class DQN_Agent():
 				if self.memory.len()<self.batch_size:
 					continue
 				batch_obs,batch_act,batch_done,batch_next_obs,batch_reward = self.memory.sample_batch(batch_size=self.batch_size)
-				y = Variable(torch.zeros(len(batch_reward)))
-				var_batch_no = Variable(torch.FloatTensor(batch_next_obs),volatile=True)
+				if self.use_cuda:
+					y = Variable(torch.zeros(len(batch_reward)).cuda())
+					var_batch_no = Variable(torch.FloatTensor(batch_next_obs).cuda(),volatile=True)
+				else:	
+					y = Variable(torch.zeros(len(batch_reward)))
+					var_batch_no = Variable(torch.FloatTensor(batch_next_obs),volatile=True)
 				next_a = self.qnet(var_batch_no)
 				targetQ,_ = torch.max(next_a,dim=1)
 				targetQ.volatile = False
@@ -121,7 +137,10 @@ class DQN_Agent():
 						y[j] = batch_reward[j]
 					else:
 						y[j] = batch_reward[j] + self.gamma*targetQ[j]
-				realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs))),dim=1,index=Variable(torch.LongTensor(batch_act)).unsqueeze(1))
+				if self.use_cuda:
+					realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs).cuda())),dim=1,index=Variable(torch.LongTensor(batch_act).cuda()).unsqueeze(1))
+				else:
+					realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs))),dim=1,index=Variable(torch.LongTensor(batch_act)).unsqueeze(1))
 				loss = self.loss(realQ,y)
 				self.optim.zero_grad()
 				loss.backward()
@@ -162,7 +181,9 @@ def main(args):
 	args = parse_arguments()
 	environment_name = args.env
 	args.cuda = not args.no_cuda and torch.cuda.is_available()
-
+	if args.cuda:
+       	 	#Use CUDNN
+        	cudnn.benchmark = True
 	agent = DQN_Agent(environment_name,args.render,args.cuda)
 
 	agent.train()
