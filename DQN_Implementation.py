@@ -176,7 +176,7 @@ class DQN_Agent():
                     if ep%10==0:
                         print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
                     if ep%500==0:
-                        torch.save(self.qnet.state_dict,self.env_name+'.dqn.pt')
+                        torch.save(self.qnet.state_dict,'results/'+self.env_name+'.dqn.pt')
                     break
 
 
@@ -307,7 +307,7 @@ class DuelingQN_Agent():
                     if ep%10==0:
                         print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
                     if ep%500==0:
-                        torch.save(self.qnet.state_dict,self.env_name+'duelingqn.pt')
+                        torch.save(self.qnet.state_dict,'results/'+self.env_name+'.duelingqn.pt')
                     break
 
 
