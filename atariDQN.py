@@ -18,6 +18,10 @@ class DQN(nn.Module):
         self.conv2 = nn.Conv2d(16,32,kernel_size=4,stride=2)
         self.fc1 = nn.Linear(2592,256)
         self.action = nn.Linear(256,action_dim)
+        nn.init.orthogonal(self.conv1.weight.data)
+        nn.init.orthogonal(self.conv2.weight.data)
+        nn.init.xavier_normal(self.fc1.weight.data)
+        nn.init.uniform(self.action.weight.data, a = -2e-3, b = 2e-3)
 
     def forward(self,obs):
         x = F.relu(self.conv1(obs))
