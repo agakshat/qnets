@@ -147,7 +147,10 @@ class DQN_Agent():
                 if np.random.rand()<self.eps:
                     act = self.env.action_space.sample()
                 else:
-                    _,act = torch.max(self.qnet(Variable(torch.from_numpy(obs).float().unsqueeze(0))),dim=1)
+                    if not self.use_cuda:
+                        _,act = torch.max(self.qnet(Variable(torch.from_numpy(obs).float().unsqueeze(0))),dim=1)
+                    else:
+                        _,act = torch.max(self.qnet(Variable(torch.from_numpy(obs).float().unsqueeze(0).cuda())),dim=1)
                     act = act.data[0]
                 next_obs,reward,done,_ = self.env.step(act)
                 self.memory.append(obs,act,done,next_obs,reward)
@@ -193,7 +196,7 @@ class DQN_Agent():
                 
                 if done:
                     reward_list[ep%10] = episode_reward
-                    if ep%10==0:
+                    if ep%1==0:
                         print ('|Reward: {:d}| Episode: {:d}'.format(int(np.mean(reward_list)),ep))
                     if ep%500==0:
                         torch.save(self.qnet.state_dict,self.env_name+'.dqn.pt')
