@@ -403,9 +403,6 @@ def main(args):
     args = parse_arguments()
     environment_name = args.env
     args.cuda = not args.no_cuda and torch.cuda.is_available()
-    if args.cuda:
-        #Use CUDNN
-        cudnn.benchmark = True
 
     if args.dueling:
         agent = DuelingQN_Agent(environment_name,args.render,args.cuda,args.target)
