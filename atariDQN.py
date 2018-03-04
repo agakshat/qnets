@@ -9,7 +9,6 @@ import random
 import pdb
 import cv2
 import copy
-import torch.backends.cudnn as cudnn
 
 class DQN(nn.Module):
     def  __init__(self,obs_dim,action_dim):
@@ -48,9 +47,18 @@ class Replay_Memory():
     def len(self):
         return len(self.memory)
 
+def soft_update(target, source, tau=0.001):
+    for target_param, param in zip(target.parameters(), source.parameters()):
+        target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau) 
+    return target
+
+def hard_update(target, source):
+    for target_param, param in zip(target.parameters(), source.parameters()):
+            target_param.data.copy_(param.data)
+
 class DQN_Agent():
     
-    def __init__(self, environment_name, render=False, use_cuda = False):
+    def __init__(self, environment_name, render=False, use_cuda = False, use_target = False):
 
         # Create an instance of the network itself, as well as the memory. 
         # Here is also a good place to set environmental parameters,
@@ -58,32 +66,36 @@ class DQN_Agent():
         self.env_name = environment_name
         self.env =  gym.make(self.env_name)
         self.qnet = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
+        self.qnet_target = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
         if use_cuda:
-                    self.qnet = nn.DataParallel(self.qnet)
-                    self.qnet = self.qnet.cuda()
-        self.qnet_target = copy.deepcopy(self.qnet)
-        self.memory = Replay_Memory(memory_size=100000)
-        self.eps_start = 0.5
-        self.eps_end = 0.05
-        self.eps_iter = 100000
-        self.eps = self.eps_start
+            self.qnet.cuda()
+            self.qnet_target.cuda()
+        hard_update(self.qnet_target,self.qnet)
+
+        self.memory = Replay_Memory(memory_size=1000000)
+        self.eps = 0.5
+
         self.num_iter = 1e6
         self.num_episodes = 300000
         self.max_ep_length = 1000
         self.render = render
-        self.batch_size = 16
+        self.batch_size = 64
+
         if self.env_name == 'MountainCar-v0':
-                    self.gamma = 1
+            self.gamma = 1
         else:
-                    self.gamma = 0.99
-        self.lr = 1e-3
+            self.gamma = 0.99
+        self.lr = 1e-4
         self.buffer_size = 50000
         self.loss = nn.MSELoss()
         if use_cuda:
-                    self.loss = self.loss.cuda()
+            self.loss = self.loss.cuda()
         self.optim = torch.optim.Adam(self.qnet.parameters(),lr=self.lr)
         self.use_cuda = use_cuda
         self.stacked_obs = np.zeros((4,84,84))
+        self.tau = 0.001
+        self.use_target = use_target
+        self.update = 'soft_update'
 
     def stackAndGray(self,obs):
         frame = cv2.cvtColor(obs,cv2.COLOR_RGB2GRAY)
@@ -133,7 +145,10 @@ class DQN_Agent():
                 else:   
                     y = Variable(torch.zeros(len(batch_reward)))
                     var_batch_no = Variable(torch.FloatTensor(batch_next_obs),volatile=True)
-                next_a = self.qnet(var_batch_no)
+                if self.use_target:
+                    next_a = self.qnet_target(var_batch_no)
+                else:
+                    next_a = self.qnet(var_batch_no)
                 targetQ,_ = torch.max(next_a,dim=1)
                 targetQ.volatile = False
                 for j in range(len(batch_obs)):
@@ -151,12 +166,29 @@ class DQN_Agent():
                 self.optim.step()
                 obs = next_obs
                 episode_reward += reward
-                reward_list[ep%10] = episode_reward
+                if self.use_target:
+                    if self.update == 'hard_update':
+                        self.qnet_target = hard_update(self.qnet_target, self.qnet)
+                    else:
+                        self.qnet_target = soft_update(self.qnet_target, self.qnet, self.tau)
                 if done:
-                    if ep%10==0:
+                    reward_list[ep%10] = episode_reward
+                    if ep%1==0:
                         print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
-                    if ep%500==0:
-                        torch.save(self.qnet.state_dict,'results/'+self.env_name+'.dqn.pt')
+                    if ep%5==0:
+                        if self.use_target:
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'.target.dqn.pt')
+                            with open("results/"+self.env_name+'.target.txt',"a") as f:
+                                f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
+                        else:
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'.dqn.pt')
+                            with open("results/"+self.env_name+'.txt',"a") as f:
+                                f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
+                    if ep%200==0:
+                        if self.use_target:
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'_'+str(ep)+'.target.dqn.pt')
+                        else:
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'_'+str(ep)+'.dqn.pt')
                     break
 
 

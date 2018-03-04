@@ -87,7 +87,7 @@ def hard_update(target, source):
     for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(param.data)
 
-class DQN_Agent():
+class LinearQN_Agent():
 
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
@@ -105,7 +105,7 @@ class DQN_Agent():
         # as well as training parameters - number of episodes / iterations, etc. 
         self.env_name = environment_name
         self.env =  gym.make(self.env_name)
-        self.qnet = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
+        self.qnet = LinearQNetwork(self.env.observation_space.shape[0],self.env.action_space.n)
         self.qnet_target = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
         if use_cuda:
             self.qnet.cuda()
@@ -113,7 +113,7 @@ class DQN_Agent():
         self.buffer_size = 50000
         self.memory = Replay_Memory(memory_size=self.buffer_size)
         self.num_iter = 1e6
-        self.num_episodes = 300000
+        self.num_episodes = 5000
         self.max_ep_length = 1000
         self.eps = 0.9
         self.render = render
@@ -203,7 +203,152 @@ class DQN_Agent():
 
                     reward_list[ep%10] = episode_reward
                     if ep%1==0:
-                        print ('|Reward: {:d}| Episode: {:d}'.format(int(np.mean(reward_list)),ep))
+                        print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
+                    if ep%10==0:
+                        if self.use_target:
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'.target.lqn.pt')
+                            with open("results/"+self.env_name+'.linear.target.txt',"a") as f:
+                                f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
+                        else:
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'.lqn.pt')
+                            with open("results/"+self.env_name+'.linear.txt',"a") as f:
+                                f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
+                    if ep%200==0:
+                        if self.use_target:
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'_'+str(ep)+'.target.lqn.pt')
+                        else:
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'_'+str(ep)+'.lqn.pt')
+                    break
+
+
+    def test(self, model_file=None):
+        # Evaluate the performance of your agent over 100 episodes, by calculating cummulative rewards for the 100 episodes.
+        # Here you need to interact with the environment, irrespective of whether you are using a memory. 
+        pass
+
+    def burn_in_memory():
+        # Initialize your replay memory with a burn_in number of episodes / transitions. 
+
+        pass
+
+
+class DQN_Agent():
+
+    # In this class, we will implement functions to do the following. 
+    # (1) Create an instance of the Q Network class.
+    # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
+    #       (a) Epsilon Greedy Policy.
+    #       (b) Greedy Policy. 
+    # (3) Create a function to train the Q Network, by interacting with the environment.
+    # (4) Create a function to test the Q Network's performance on the environment.
+    # (5) Create a function for Experience Replay.
+    
+    def __init__(self, environment_name, render=False, use_cuda = False, use_target = False):
+
+        # Create an instance of the network itself, as well as the memory. 
+        # Here is also a good place to set environmental parameters,
+        # as well as training parameters - number of episodes / iterations, etc. 
+        self.env_name = environment_name
+        self.env =  gym.make(self.env_name)
+        self.qnet = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
+        self.qnet_target = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
+        if use_cuda:
+            self.qnet.cuda()
+            self.qnet_target.cuda() 
+        self.buffer_size = 50000
+        self.memory = Replay_Memory(memory_size=self.buffer_size)
+        self.num_iter = 1e6
+        self.num_episodes = 8000
+        self.max_ep_length = 1000
+        self.eps = 0.9
+        self.render = render
+        self.batch_size = 256
+        if self.env_name == 'MountainCar-v0':
+            self.gamma = 1.0
+        else:
+            self.gamma = 0.99
+        self.lr = 1e-3
+        self.loss = nn.MSELoss()
+        self.optim = torch.optim.Adam(self.qnet.parameters(),lr=self.lr)
+        self.use_cuda = use_cuda
+        self.update = 'soft_update'
+        self.tau = 0.001
+        self.use_target = use_target
+
+    def train(self):
+        # In this function, we will train our network. 
+        # If training without experience replay_memory, then you will interact with the environment 
+        # in this function, while also updating your network parameters. 
+
+        # If you are using a replay memory, you should interact with environment here, and store these 
+        # transitions to memory, while also updating your model.
+        reward_list = np.zeros(10)
+        for ep in range(self.num_episodes):
+            obs = self.env.reset()
+            episode_reward = 0
+
+            if self.eps>0.05:
+                self.eps = -0.0009*ep + 0.5  
+            for iteration in range(self.max_ep_length):
+                if self.render:
+                    self.env.render()
+                if np.random.rand()<self.eps:
+                    act = self.env.action_space.sample()
+                else:
+                    if not self.use_cuda:
+                        _,act = torch.max(self.qnet(Variable(torch.from_numpy(obs).float().unsqueeze(0))),dim=1)
+                    else:
+                        _,act = torch.max(self.qnet(Variable(torch.from_numpy(obs).float().unsqueeze(0).cuda())),dim=1)
+                    act = act.data[0]
+                next_obs,reward,done,_ = self.env.step(act)
+                self.memory.append(obs,act,done,next_obs,reward)
+                if self.memory.len()<self.batch_size:
+                    continue
+                batch_obs,batch_act,batch_done,batch_next_obs,batch_reward = self.memory.sample_batch(batch_size=self.batch_size)
+                #if (batch_obs[0]!=obs)
+                #pdb.set_trace()
+                if self.use_cuda:
+                    y = Variable(torch.zeros(len(batch_reward)).cuda())
+                    var_batch_no = Variable(torch.FloatTensor(batch_next_obs).cuda(),volatile=True)
+                else:
+                    y = Variable(torch.zeros(len(batch_reward)))
+                    var_batch_no = Variable(torch.FloatTensor(batch_next_obs),volatile=True)
+                if self.use_target:
+                    next_a = self.qnet_target(var_batch_no)
+                else:
+                    next_a = self.qnet(var_batch_no)
+                targetQ,_ = torch.max(next_a,dim=1)
+                targetQ.volatile = False
+                for j in range(len(batch_obs)):
+                    if batch_done[j]:
+                        y[j] = batch_reward[j]
+                    else:
+                        y[j] = batch_reward[j] + self.gamma*targetQ[j]
+                #pdb.set_trace()
+                if self.use_cuda:
+                    realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs).cuda())),dim=1,index=Variable(torch.LongTensor(batch_act).cuda()).unsqueeze(1))
+                else:
+                    realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs))),dim=1,index=Variable(torch.LongTensor(batch_act)).unsqueeze(1))
+                #print("realQ: {}, y: {}".format(realQ.data[0],y.data[0]))
+                #loss = self.mse_loss(realQ,y)
+                loss = self.loss(realQ,y)
+                #print("loss: ",loss.data[0])
+                self.optim.zero_grad()
+                loss.backward()
+                self.optim.step()
+                obs = next_obs
+                episode_reward += reward
+                if self.use_target:
+                    if self.update == 'hard_update':
+                        self.qnet_target = hard_update(self.qnet_target, self.qnet)
+                    else:
+                        self.qnet_target = soft_update(self.qnet_target, self.qnet, self.tau)
+                
+                if done:
+
+                    reward_list[ep%10] = episode_reward
+                    if ep%1==0:
+                        print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
                     if ep%10==0:
                         if self.use_target:
                             torch.save(self.qnet.state_dict,'results/'+self.env_name+'.target.dqn.pt')
@@ -256,7 +401,7 @@ class DuelingQN_Agent():
             self.qnet_target = self.qnet_target.cuda()
         self.memory = Replay_Memory(memory_size=100000)
         self.num_iter = 1e6
-        self.num_episodes = 300000
+        self.num_episodes = 8000
         self.max_ep_length = 1000
         self.render = render
         self.batch_size = 64
@@ -360,7 +505,7 @@ class DuelingQN_Agent():
                 if done:
                     reward_list[ep%10] = episode_reward
                     if ep%1==0:
-                        print ('|Reward: {:d}| Episode: {:d}'.format(int(np.mean(reward_list)),ep))
+                        print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
                     if ep%10==0:
                         if self.use_target:
                             torch.save(self.qnet.state_dict,'results/'+self.env_name+'.dueling.target.dqn.pt')
@@ -391,11 +536,11 @@ class DuelingQN_Agent():
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Deep Q Network Argument Parser')
-    parser.add_argument('--env',dest='env',type=str)
+    parser.add_argument('--env',dest='env',type=str,default='CartPole-v0')
     parser.add_argument('--render',dest='render',type=int,default=0)
     parser.add_argument('--train',dest='train',type=int,default=1)
     parser.add_argument('--model',dest='model_file',type=str)
-    parser.add_argument('--dueling',dest='dueling',type=int,default=0)
+    parser.add_argument('--type',dest='dueling',type=int,default=1) # 0 for Linear, 1 for DQN, 2 for  Dueling
     parser.add_argument('--no-cuda',action='store_true',default=False)
     parser.add_argument('--target',dest='target',type=int,default=0)
     return parser.parse_args()
@@ -406,9 +551,11 @@ def main(args):
     environment_name = args.env
     args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-    if args.dueling:
+    if args.dueling==0:
+        agent = LinearQN_Agent(environment_name,args.render,args.cuda,args.target)
+    elif args.dueling==2:
         agent = DuelingQN_Agent(environment_name,args.render,args.cuda,args.target)
-    else:
+    elif args.dueling==1:
         agent = DQN_Agent(environment_name,args.render,args.cuda,args.target)
 
     agent.train()
