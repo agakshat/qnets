@@ -36,16 +36,14 @@ class DQN(nn.Module):
 class DuelingQN(nn.Module):
     def  __init__(self,obs_dim,action_dim):
         super().__init__()
-        self.fc1 = nn.Linear(obs_dim,30)
-        self.fc2 = nn.Linear(30,30)
-        self.fc3 = nn.Linear(30,30)
-        self.adv = nn.Linear(30,action_dim)
-        self.val = nn.Linear(30,1)
+        self.fc1 = nn.Linear(obs_dim,64)
+        self.fc2 = nn.Linear(64,32)
+        self.adv = nn.Linear(32,action_dim)
+        self.val = nn.Linear(32,1)
 
     def forward(self,obs):
         x = F.relu(self.fc1(obs))
         x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
         adv = self.adv(x)
         val = self.val(x)
         return adv,val
@@ -370,9 +368,9 @@ class DuelingQN_Agent():
                                 f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
                     if ep%200==0:
                         if self.use_target:
-                            torch.save(self.qnet.state_dict,'results/'+self.env.name+'_'+str(ep)+'.dueling.target.dqn.pt')
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'_'+str(ep)+'.dueling.target.dqn.pt')
                         else:
-                            torch.save(self.qnet.state_dict,'results/'+self.env.name+'_'+str(ep)+'.dueling.dqn.pt')
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'_'+str(ep)+'.dueling.dqn.pt')
                     break
 
 
