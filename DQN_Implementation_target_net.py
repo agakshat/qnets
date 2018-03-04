@@ -198,19 +198,24 @@ class DQN_Agent():
                         self.qnet_target = soft_update(self.qnet_target, self.qnet, self.tau)
                 
                 if done:
+
                     reward_list[ep%10] = episode_reward
                     if ep%1==0:
                         print ('|Reward: {:d}| Episode: {:d}'.format(int(np.mean(reward_list)),ep))
                     if ep%10==0:
                         if self.use_target:
                             torch.save(self.qnet.state_dict,'results/'+self.env_name+'.target.dqn.pt')
+                            with open("results/"+self.env_name+'.target.txt',"a") as f:
+                                f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
                         else:
                             torch.save(self.qnet.state_dict,'results/'+self.env_name+'.dqn.pt')
+                            with open("results/"+self.env_name+'.txt',"a") as f:
+                                f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
                     if ep%200==0:
                         if self.use_target:
-                            torch.save(self.qnet.state_dict,'results/'+self.env.name+'_'+str(ep)+'.target.dqn.pt')
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'_'+str(ep)+'.target.dqn.pt')
                         else:
-                            torch.save(self.qnet.state_dict,'results/'+self.env.name+'_'+str(ep)+'.dqn.pt')
+                            torch.save(self.qnet.state_dict,'results/'+self.env_name+'_'+str(ep)+'.dqn.pt')
                     break
 
 
@@ -357,8 +362,12 @@ class DuelingQN_Agent():
                     if ep%10==0:
                         if self.use_target:
                             torch.save(self.qnet.state_dict,'results/'+self.env_name+'.dueling.target.dqn.pt')
+                            with open("results/"+self.env_name+'.dueling.target.txt',"a") as f:
+                                f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
                         else:
                             torch.save(self.qnet.state_dict,'results/'+self.env_name+'.dueling.dqn.pt')
+                            with open("results/"+self.env_name+'.dueling.txt',"a") as f:
+                                f.write('|Reward: {:d}| Episode: {:d}\n'.format(int(np.mean(reward_list)),ep))
                     if ep%200==0:
                         if self.use_target:
                             torch.save(self.qnet.state_dict,'results/'+self.env.name+'_'+str(ep)+'.dueling.target.dqn.pt')
