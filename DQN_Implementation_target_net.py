@@ -40,6 +40,10 @@ class DuelingQN(nn.Module):
         self.fc2 = nn.Linear(64,32)
         self.adv = nn.Linear(32,action_dim)
         self.val = nn.Linear(32,1)
+        nn.init.xavier_normal(self.fc1.weight.data)
+        nn.init.xavier_normal(self.fc2.weight.data)
+        nn.init.uniform(self.adv.weight.data, a = -2e-3, b = 2e-3)
+        nn.init.uniform(self.val.weight.data, a = -2e-3, b = 2e-3)
 
     def forward(self,obs):
         x = F.relu(self.fc1(obs))
