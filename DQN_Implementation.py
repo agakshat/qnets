@@ -20,9 +20,9 @@ class LinearQNetwork(nn.Module):
 class DQN(nn.Module):
     def  __init__(self,obs_dim,action_dim):
         super().__init__()
-        self.fc1 = nn.Linear(obs_dim,16)
-        self.fc2 = nn.Linear(16, 16)
-        self.fc3 = nn.Linear(16 ,action_dim)
+        self.fc1 = nn.Linear(obs_dim,30)
+        self.fc2 = nn.Linear(30, 30)
+        self.fc3 = nn.Linear(30 ,action_dim)
 
     def forward(self,obs):
         x = F.relu(self.fc1(obs))
@@ -33,11 +33,11 @@ class DQN(nn.Module):
 class DuelingQN(nn.Module):
     def  __init__(self,obs_dim,action_dim):
         super().__init__()
-        self.fc1 = nn.Linear(obs_dim,16)
-        self.fc2 = nn.Linear(16,16)
-        self.fc3 = nn.Linear(16,16)
-        self.adv = nn.Linear(16,action_dim)
-        self.val = nn.Linear(16,1)
+        self.fc1 = nn.Linear(obs_dim,30)
+        self.fc2 = nn.Linear(30,30)
+        self.fc3 = nn.Linear(30,30)
+        self.adv = nn.Linear(30,action_dim)
+        self.val = nn.Linear(30,1)
 
     def forward(self,obs):
         x = F.relu(self.fc1(obs))
