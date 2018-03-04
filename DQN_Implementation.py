@@ -25,8 +25,8 @@ class DQN(nn.Module):
         self.fc3 = nn.Linear(16 ,action_dim)
 
     def forward(self,obs):
-        x = F.tanh(self.fc1(obs))
-        x = F.tanh(self.fc2(x))
+        x = F.relu(self.fc1(obs))
+        x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
 
@@ -96,10 +96,7 @@ class DQN_Agent():
             self.qnet = nn.DataParallel(self.qnet)
             self.qnet = self.qnet.cuda()
         self.memory = Replay_Memory(memory_size=100000)
-        self.eps_start = 0.5
-        self.eps_end = 0.05
-        self.eps_iter = 100000
-        self.eps = self.eps_start
+        self.eps = 0.9
         self.num_iter = 1e6
         self.num_episodes = 300000
         self.max_ep_length = 1000
@@ -122,12 +119,13 @@ class DQN_Agent():
 
         # If you are using a replay memory, you should interact with environment here, and store these 
         # transitions to memory, while also updating your model.
+        reward_list = np.zeros(10)
         for ep in range(self.num_episodes):
             obs = self.env.reset()
             episode_reward = 0
-            reward_list = np.zeros(10)
+            
             if self.eps>0.05:
-                self.eps = -0.0015*ep + 0.9  
+                self.eps = -0.0009*ep + 0.5  
             for iteration in range(self.max_ep_length):
                 if self.render:
                     self.env.render()
@@ -171,10 +169,11 @@ class DQN_Agent():
                 self.optim.step()
                 obs = next_obs
                 episode_reward += reward
-                reward_list[ep%10] = episode_reward
+                
                 if done:
+                    reward_list[ep%10] = episode_reward
                     if ep%10==0:
-                        print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
+                        print ('|Reward: {:d}| Episode: {:d}'.format(int(np.mean(reward_list)),ep))
                     if ep%500==0:
                         torch.save(self.qnet.state_dict,'results/'+self.env_name+'.dqn.pt')
                     break
@@ -213,10 +212,7 @@ class DuelingQN_Agent():
             self.qnet = DataParallel(self.qnet)
             self.qnet = self.qnet.cuda()
         self.memory = Replay_Memory(memory_size=100000)
-        self.eps_start = 0.5
-        self.eps_end = 0.05
-        self.eps_iter = 100000
-        self.eps = self.eps_start
+        self.eps = 0.5
         self.num_iter = 1e6
         self.num_episodes = 300000
         self.max_ep_length = 1000
@@ -241,10 +237,11 @@ class DuelingQN_Agent():
 
         # If you are using a replay memory, you should interact with environment here, and store these 
         # transitions to memory, while also updating your model.
+        reward_list = np.zeros(10)
         for ep in range(self.num_episodes):
             obs = self.env.reset()
             episode_reward = 0
-            reward_list = np.zeros(10)
+            
             if self.eps>0.05:
                 self.eps = -0.0009*ep + 0.5  
             for iteration in range(self.max_ep_length):
@@ -302,10 +299,11 @@ class DuelingQN_Agent():
                 self.optim.step()
                 obs = next_obs
                 episode_reward += reward
-                reward_list[ep%10] = episode_reward
+                
                 if done:
+                    reward_list[ep%10] = episode_reward
                     if ep%10==0:
-                        print ('|Reward: {:d}| Episode: {:d}'.format(int(episode_reward),ep))
+                        print ('|Reward: {:d}| Episode: {:d}'.format(int(np.mean(reward_list)),ep))
                     if ep%500==0:
                         torch.save(self.qnet.state_dict,'results/'+self.env_name+'.duelingqn.pt')
                     break
