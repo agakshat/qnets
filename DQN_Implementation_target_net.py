@@ -107,7 +107,7 @@ class DQN_Agent():
         self.qnet_target = DQN(self.env.observation_space.shape[0],self.env.action_space.n)
         if use_cuda:
             self.qnet.cuda()
-            self.qnet.target.cuda() 
+            self.qnet_target.cuda() 
         self.buffer_size = 50000
         self.memory = Replay_Memory(memory_size=self.buffer_size)
         self.num_iter = 1e6
