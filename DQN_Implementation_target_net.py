@@ -113,7 +113,7 @@ class LinearQN_Agent():
         self.buffer_size = 50000
         self.memory = Replay_Memory(memory_size=self.buffer_size)
         self.num_iter = 1e6
-        self.num_episodes = 5000
+        self.num_episodes = 10000
         self.max_ep_length = 1000
         self.eps = 0.9
         self.render = render
