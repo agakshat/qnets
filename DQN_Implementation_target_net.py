@@ -115,7 +115,7 @@ class LinearQN_Agent():
         self.num_iter = 1e6
         self.num_episodes = 10000
         self.max_ep_length = 1000
-        self.eps = 0.9
+        self.eps = 0.5
         self.render = render
         self.batch_size = 256
         if self.env_name == 'MountainCar-v0':
@@ -231,6 +231,7 @@ class LinearQN_Agent():
         if render:
             num = 5
             self.env.render()
+            time.sleep(0.1)
             input("Press Enter to continue")
         else:
             num = 100
@@ -251,7 +252,7 @@ class LinearQN_Agent():
             reward_list.append(episode_reward)
         self.env.close()
         reward_list = np.array(reward_list)
-        return np.mean(reward_list),np.std(reward_list),reward_list
+        print (np.mean(reward_list),np.std(reward_list),reward_list)
 
     def burn_in_memory():
         # Initialize your replay memory with a burn_in number of episodes / transitions. 
@@ -401,8 +402,10 @@ class DQN_Agent():
         self.qnet.load_state_dict(params)
         obs = self.env.reset()
         if render:
+            print("got here")
             num = 5
             self.env.render()
+            print("did not get here")
             input("Press Enter to continue")
         else:
             num = 100
@@ -423,7 +426,7 @@ class DQN_Agent():
             reward_list.append(episode_reward)
         self.env.close()
         reward_list = np.array(reward_list)
-        return np.mean(reward_list),np.std(reward_list),reward_list
+        print (np.mean(reward_list),np.std(reward_list),reward_list)
 
     def burn_in_memory():
         # Initialize your replay memory with a burn_in number of episodes / transitions. 
@@ -585,7 +588,7 @@ class DuelingQN_Agent():
         self.qnet.load_state_dict(params)
         obs = self.env.reset()
         if render:
-            num = 5
+            num = 20
             self.env.render()
             input("Press Enter to continue")
         else:
@@ -609,7 +612,7 @@ class DuelingQN_Agent():
             reward_list.append(episode_reward)
         self.env.close()
         reward_list = np.array(reward_list)
-        return np.mean(reward_list),np.std(reward_list),reward_list
+        print (np.mean(reward_list),np.std(reward_list),reward_list)
 
     def burn_in_memory():
         # Initialize your replay memory with a burn_in number of episodes / transitions. 
@@ -626,6 +629,8 @@ def parse_arguments():
     parser.add_argument('--type',dest='dueling',type=int,default=1) # 0 for Linear, 1 for DQN, 2 for  Dueling
     parser.add_argument('--no-cuda',action='store_true',default=False)
     parser.add_argument('--target',dest='target',type=int,default=0)
+    parser.add_argument('--test',dest='test',type=int,default=0)
+    parser.add_argument('--load',dest='load',type=str)
     return parser.parse_args()
 
 def main(args):
@@ -640,8 +645,11 @@ def main(args):
         agent = DuelingQN_Agent(environment_name,args.render,args.cuda,args.target)
     elif args.dueling==1:
         agent = DQN_Agent(environment_name,args.render,args.cuda,args.target)
-
-    agent.train()
+    
+    if not args.test:
+        agent.train()
+    else:
+        agent.test(args.load,args.render)
 
 if __name__ == '__main__':
     main(sys.argv)
