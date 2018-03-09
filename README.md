@@ -13,6 +13,7 @@ Commands to run:
 1. Linear Q-Networks:
 
 Training: `python DQN_Implementation.py --env CartPole-v0 --type 0`
+
 Testing: `python DQN_Implementation.py --env CartPole-v0 --type 0 --test 1 --load <path_to_file>`
 
 Note: To run with no experience replay, please go into the code for LinearQ_Agent and change `self.buffer_size` and `self.batch_size` to 1.
@@ -20,19 +21,24 @@ Note: To run with no experience replay, please go into the code for LinearQ_Agen
 2. DQN:
 
 Training: `python DQN_Implementation.py --env CartPole-v0 --type 1`
+
 Testing: `python DQN_Implementation.py --env CartPole-v0 --type 1 --test 1 --load <path_to_file>`
 
 3. Dueling Q-Networks:
 
 Training: `python DQN_Implementation.py --env CartPole-v0 --type 2`
+
 Testing: `python DQN_Implementation.py --env CartPole-v0 --type 2 --test 1 --load <path_to_file>`
 
 4. Atari DQN:
 
 Training: `python DQN_Implementation.py --env CartPole-v0 --type 3`
+
 Testing: `python DQN_Implementation.py --env CartPole-v0 --type 3 --test 1 --load <path_to_file>`
 
-Additional Flags: The flags are parsed at the very end of the `DQN_Implementation.py` file, with comments on their usage. However, I am also mentioning here for completeness.
+Additional Flags: 
+
+The flags are parsed at the very end of the `DQN_Implementation.py` file, with comments on their usage. However, I am also mentioning here for completeness.
 
 1. `--env` environment name (default: `CartPole-v0`)
 2. `--render`  pass 1 for rendering during test time, never renders during training (default: 0)
