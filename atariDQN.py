@@ -214,10 +214,41 @@ class DQN_Agent():
                     break
 
 
-    def test(self, model_file=None):
+    def test(self, model_file=None, render=False):
         # Evaluate the performance of your agent over 100 episodes, by calculating cummulative rewards for the 100 episodes.
         # Here you need to interact with the environment, irrespective of whether you are using a memory. 
-        pass
+        self.env =  gym.make(self.env_name)
+        params = torch.load(model_file,map_location = lambda storage, loc: storage)()
+        self.qnet.load_state_dict(params)
+        obs = self.env.reset()
+        self.stackAndGray(obs)
+        if render:
+            num = 5
+            self.env.render()
+            input("Press Enter to continue")
+        else:
+            num = 100
+        reward_list = []
+        for ep in range(num):
+            episode_reward = 0
+            while True:
+                if render:
+                    self.env.render()
+                q = self.qnet(Variable(torch.from_numpy(self.stacked_obs).float().unsqueeze(0)))
+                _,act = torch.max(q,dim=1)
+                act = act.data[0]
+                next_obs,reward,done,_ = self.env.step(act)
+                self.stackAndGray(next_obs)
+                episode_reward += reward
+                if done:
+                    self.env.reset()
+                    break
+                obs = next_obs
+            reward_list.append(episode_reward)
+        self.env.close()
+        reward_list = np.array(reward_list)
+        print (np.mean(reward_list),np.std(reward_list),reward_list)
+
 
     def burn_in_memory():
         # Initialize your replay memory with a burn_in number of episodes / transitions. 
