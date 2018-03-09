@@ -231,7 +231,6 @@ class LinearQN_Agent():
         if render:
             num = 5
             self.env.render()
-            time.sleep(0.1)
             input("Press Enter to continue")
         else:
             num = 100
@@ -588,7 +587,7 @@ class DuelingQN_Agent():
         self.qnet.load_state_dict(params)
         obs = self.env.reset()
         if render:
-            num = 20
+            num = 5
             self.env.render()
             input("Press Enter to continue")
         else:
