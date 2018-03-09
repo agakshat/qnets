@@ -1,0 +1,6 @@
+results/
+some_results/
+old_results/
+*.pyc
+__pycache__/
+10703HW2\ Videos/
