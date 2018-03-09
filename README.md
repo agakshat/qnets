@@ -32,9 +32,9 @@ Testing: `python DQN_Implementation.py --env CartPole-v0 --type 2 --test 1 --loa
 
 4. Atari DQN:
 
-Training: `python DQN_Implementation.py --env CartPole-v0 --type 3`
+Training: `python DQN_Implementation.py --env SpaceInvaders-v0 --type 3`
 
-Testing: `python DQN_Implementation.py --env CartPole-v0 --type 3 --test 1 --load <path_to_file>`
+Testing: `python DQN_Implementation.py --env SpaceInvaders-v0 --type 3 --test 1 --load <path_to_file>`
 
 Additional Flags: 
 
