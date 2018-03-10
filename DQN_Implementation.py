@@ -166,11 +166,25 @@ class LinearQN_Agent():
                     next_a = self.qnet(var_batch_no)
                 targetQ,_ = torch.max(next_a,dim=1)
                 targetQ.volatile = False
+                """
                 for j in range(len(batch_obs)): # to deal with episode ending case (could be optimized without a loop too)
                     if batch_done[j]:
                         y[j] = batch_reward[j]
                     else:
                         y[j] = batch_reward[j] + self.gamma*targetQ[j]
+                """
+                if self.env_name == 'MountainCar-v0':
+                    state_flag = torch.FloatTensor(batch_next_obs)<=0.5
+                    state_flag = state_flag[:,0].float()
+                    if self.use_cuda:
+                        y = Variable(torch.cuda.FloatTensor(batch_reward)) + self.gamma*targetQ*Variable(1-torch.cuda.FloatTensor(batch_done)) + self.gamma*targetQ*Variable(torch.cuda.FloatTensor(batch_done))*Variable(state_flag.cuda())
+                    else:
+                        y = Variable(torch.FloatTensor(batch_reward)) + self.gamma*targetQ*Variable(1-torch.FloatTensor(batch_done)) + self.gamma*targetQ*Variable(torch.FloatTensor(batch_done))*Variable(state_flag)
+                else:
+                    if self.use_cuda:
+                        y = Variable(torch.cuda.FloatTensor(batch_reward)) + self.gamma*targetQ*Variable(1-torch.cuda.FloatTensor(batch_done))
+                    else:
+                        y = Variable(torch.FloatTensor(batch_reward)) + self.gamma*targetQ*Variable(1-torch.FloatTensor(batch_done))
                 if self.use_cuda:
                     realQ = torch.gather(self.qnet(Variable(torch.FloatTensor(batch_obs).cuda())),dim=1,index=Variable(torch.LongTensor(batch_act).cuda()).unsqueeze(1))
                 else:
